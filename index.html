@@ -1,0 +1,298 @@
+<!-- 
+  Scrabble HW5 - One Line & Full Board (Extra Credit + Dictionary Validation)
+  Student: Mengly Lim
+  Course: COMP 4610 - GUI Programming
+  Date: June 30, 2025
+-->
+  
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scrabble HW5</title>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <style>
+    #tile-rack {
+      display: flex;
+      margin: 20px auto;
+      justify-content: center;
+      padding: 10px;
+      background-image: url('graphics_data/scrabble-tile-holder-406774_640.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      height: 100px;
+    }
+
+    .tile {
+      width: 60px;
+      height: 60px;
+      margin: 5px;
+      cursor: move;
+      position: relative;
+      background-color: #e2c290;
+      text-align: center;
+      line-height: 60px;
+      font-weight: bold;
+      font-size: 28px;
+      color: black;
+      border-radius: 4px;
+      border: 1px solid #999;
+      font-family: Arial, sans-serif;
+      box-shadow: 2px 2px 2px rgba(0,0,0,0.2);
+    }
+
+    #scrabble-board {
+      display: flex;
+      justify-content: center;
+      margin: 20px;
+    }
+
+    #single-board {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      width: fit-content;
+      margin: auto;
+    }
+
+    #full-board {
+      display: grid;
+      grid-template-columns: repeat(15, 45px);
+      grid-template-rows: repeat(15, 45px);
+      gap: 2px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+
+    .board-square {
+      width: 45px;
+      height: 45px;
+      border: 1px solid #ccc;
+      background-color: #f2f2f2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .double-letter {
+      background-color: lightblue;
+    }
+
+    .double-word {
+      background-color: lightpink;
+    }
+
+    #controls {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    #word-preview {
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center">Scrabble HW5 - One Line & Full Board</h1>
+  <div id="tile-rack"></div>
+
+  <div style="text-align:center;">
+    <button onclick="showBoard('single')">Single Line Board</button>
+    <button onclick="showBoard('full')">Full Board</button>
+  </div>
+
+  <div id="scrabble-board">
+    <div id="single-board">
+      <div class="board-square"></div>
+      <div class="board-square"></div>
+      <div class="board-square double-word"></div>
+      <div class="board-square"></div>
+      <div class="board-square"></div>
+      <div class="board-square double-letter"></div>
+      <div class="board-square"></div>
+      <div class="board-square double-letter"></div>
+      <div class="board-square"></div>
+      <div class="board-square"></div>
+      <div class="board-square double-word"></div>
+      <div class="board-square"></div>
+      <div class="board-square"></div>
+      <div class="board-square"></div>
+      <div class="board-square"></div>
+    </div>
+    <div id="full-board" style="display:none;"></div>
+  </div>
+
+  <div id="word-preview">Word: </div>
+  <div id="score" style="text-align:center; font-size:20px;">Score: 0</div>
+  <div id="controls">
+    <button id="submitWord">Submit Word</button>
+    <button id="resetGame">Reset</button>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  <script>
+    let tileData = [];
+    let currentHand = [];
+    let totalScore = 0;
+    let dictionary = [];
+
+    fetch('graphics_data/pieces.json')
+      .then(res => res.json())
+      .then(data => {
+        tileData = data.pieces;
+        dealTiles(7);
+        renderFullBoard();
+      });
+
+    fetch('graphics_data/wordlist.json')
+      .then(res => res.json())
+      .then(data => {
+        dictionary = Object.keys(data); // Convert object to word array
+        console.log("Dictionary loaded with", dictionary.length, "words");
+      });
+
+    function showBoard(type) {
+      document.getElementById("single-board").style.display = type === 'single' ? 'flex' : 'none';
+      document.getElementById("full-board").style.display = type === 'full' ? 'grid' : 'none';
+    }
+
+    function renderFullBoard() {
+      const board = document.getElementById("full-board");
+      for (let i = 0; i < 225; i++) {
+        const square = document.createElement("div");
+        square.className = "board-square";
+        board.appendChild(square);
+      }
+      enableDroppables();
+    }
+
+    function dealTiles(count) {
+      const rack = document.getElementById("tile-rack");
+      const currentTiles = rack.querySelectorAll(".tile");
+      currentHand = Array.from(currentTiles);
+      const pool = [];
+      tileData.forEach(tile => {
+        for (let i = 0; i < tile.amount; i++) pool.push(tile.letter);
+      });
+      for (let i = 0; i < count; i++) {
+        const index = Math.floor(Math.random() * pool.length);
+        const letter = pool.splice(index, 1)[0];
+        if (!letter) continue;
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.textContent = letter;
+        tile.dataset.letter = letter;
+        $(tile).draggable({ revert: "invalid" });
+        rack.appendChild(tile);
+        currentHand.push(tile);
+      }
+    }
+
+    function getWord() {
+      let squares = document.querySelectorAll("#scrabble-board .board-square");
+      let word = "";
+      squares.forEach(square => {
+        const tile = square.querySelector(".tile");
+        word += tile ? tile.textContent : "";
+      });
+      return word;
+    }
+
+    function isAdjacent() {
+      const boardSquares = document.querySelectorAll("#scrabble-board .board-square");
+      const usedIndices = [];
+      boardSquares.forEach((square, idx) => {
+        if (square.querySelector(".tile")) usedIndices.push(idx);
+      });
+      for (let i = 1; i < usedIndices.length; i++) {
+        if (usedIndices[i] !== usedIndices[i - 1] + 1) return false;
+      }
+      return usedIndices.length > 0;
+    }
+
+    function enableDroppables() {
+      $(".board-square").droppable({
+        accept: ".tile",
+        drop: function (event, ui) {
+          const $this = $(this);
+          const tile = ui.draggable;
+          if ($this.find(".tile").length === 0) {
+            $this.append(tile);
+            tile.css({ top: 0, left: 0, position: "relative" });
+            tile.draggable("enable");
+            updateScore();
+            updateWord();
+          } else {
+            tile.draggable("option", "revert", true);
+          }
+        }
+      });
+    }
+
+    $(function () {
+      enableDroppables();
+      $('#submitWord').click(() => {
+        const word = getWord().toLowerCase();
+        console.log("Submitted word:", word);
+
+        if (!isAdjacent()) {
+          alert("Tiles must be placed adjacent to each other.");
+          return;
+        }
+
+        if (!dictionary.includes(word)) {
+          alert(`'${word}' is not a valid word.`);
+          return;
+        }
+
+        const usedTiles = $(".board-square .tile");
+        const usedCount = usedTiles.length;
+        usedTiles.remove();
+        totalScore += getCurrentScore();
+        $('#score').text("Score: " + totalScore);
+        updateWord();
+        dealTiles(usedCount);
+      });
+
+      $('#resetGame').click(() => {
+        $('.board-square').empty();
+        $('#tile-rack').empty();
+        totalScore = 0;
+        $('#score').text("Score: 0");
+        $('#word-preview').text("Word: ");
+        dealTiles(7);
+      });
+    });
+
+    function updateScore() {
+      const score = getCurrentScore();
+      $("#score").text("Score: " + (totalScore + score));
+    }
+
+    function getCurrentScore() {
+      let score = 0;
+      $(".board-square").each(function () {
+        const $tile = $(this).find(".tile");
+        if ($tile.length > 0) {
+          const letter = $tile.data("letter");
+          const tileInfo = tileData.find(t => t.letter === letter);
+          let value = tileInfo ? tileInfo.value : 0;
+          if ($(this).hasClass("double-letter")) value *= 2;
+          score += value;
+        }
+      });
+      if ($(".board-square.double-word .tile").length > 0) score *= 2;
+      return score;
+    }
+
+    function updateWord() {
+      const word = getWord();
+      document.getElementById("word-preview").textContent = "Word: " + word;
+    }
+  </script>
+</body>
+</html>
